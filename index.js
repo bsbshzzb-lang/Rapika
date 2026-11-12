@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer-core');
+const fs = require('fs');
 
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672';
 const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10);
@@ -6,26 +7,24 @@ const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10);
 const MAX_DATA_MB = parseFloat(process.env.MAX_MB || '1.0');
 const MAX_DATA_BYTES = MAX_DATA_MB * 1024 * 1024; 
 
-const sessionMinutes = parseInt(process.env.SESSION_MINUTES || '5', 10);
+const sessionMinutes = parseFloat(process.env.SESSION_MINUTES || '0.5');
 
-// স্ক্রিনশট অনুযায়ী DataImpulse SOCKS5 প্রক্সি ডিটেইলস
-const proxyHost = 'gw.dataimpulse.com';
-const proxyPort = '10000';
-const proxyUser = process.env.PROXY_USER_INPUT || '4903c5e423ff85d767de_gr';
-const proxyPass = 'c0615eb1ff9d5fad';
+// GitHub এবং Termux উভয় পরিবেশের জন্য ব্রাউজার পাথ চেক
+const executablePath = fs.existsSync('/usr/bin/google-chrome') 
+    ? '/usr/bin/google-chrome' 
+    : '/data/data/com.termux/files/usr/bin/chromium';
 
 function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 async function runVisitor(visitorNum) {
-    console.log(`[Visitor ${visitorNum}] Starting session -> Proxy User: [${proxyUser}] | Max Limit: ${MAX_DATA_MB} MB`);
+    console.log(`[Visitor ${visitorNum}] Starting direct session -> Max Limit: ${MAX_DATA_MB} MB`);
 
     const browser = await puppeteer.launch({
-        executablePath: '/usr/bin/google-chrome',
+        executablePath: executablePath,
         headless: 'new',
         args: [
-            `--proxy-server=socks5://${proxyHost}:${proxyPort}`,
             '--ignore-certificate-errors',
             '--ignore-certificate-errors-spki-list',
             '--no-sandbox',
@@ -52,12 +51,6 @@ async function runVisitor(visitorNum) {
 
     try {
         const page = await browser.newPage();
-        
-        // প্রক্সি অথেন্টিকেশন সেটআপ
-        await page.authenticate({
-            username: proxyUser,
-            password: proxyPass
-        });
 
         await page.evaluateOnNewDocument(() => {
             Object.defineProperty(navigator, 'webdriver', { get: () => false });
@@ -130,13 +123,13 @@ async function runVisitor(visitorNum) {
             
             for (let step = 1; step <= 3; step++) {
                 if (totalBytesTransferred >= MAX_DATA_BYTES) break;
-                await page.waitForTimeout(2000); 
+                await new Promise(resolve => setTimeout(resolve, 2000)); 
                 
                 const clickedInfo = await page.evaluate(() => {
                     const elements = Array.from(document.querySelectorAll('button, a, div, span, input[type="button"], input[type="submit"]'));
                     const targetKeywords = [
                         'yes', 'continue', 'i am 18', 'i am over 18', '18+', 'enter', 
-                        'agree', 'accept', 'verify', 'proceed', 'ok', 'موافق', 'حاب', 'human', 'Access', 'i agree'
+                        'agree', 'accept', 'verify', 'proceed', 'ok', 'موافق', 'حاب', 'human', 'access', 'i agree'
                     ];
 
                     for (let el of elements) {
@@ -162,7 +155,7 @@ async function runVisitor(visitorNum) {
 
         // সেন্ট্রাল ক্লিক এবং রিডাইরেক্ট পেজ হ্যান্ডলিং
         try {
-            await page.waitForTimeout(3000);
+            await new Promise(resolve => setTimeout(resolve, 3000));
             let actionDone = false;
 
             const playClicked = await page.evaluate(() => {
@@ -190,40 +183,40 @@ async function runVisitor(visitorNum) {
             }
 
             if (!actionDone) {
-                console.log(`[Visitor ${visitorNum}] No explicit action button found. Waiting until 15s to click center of screen...`);
-                await page.waitForTimeout(5000); 
+                console.log(`[Visitor ${visitorNum}] No explicit action button found. Waiting to click center of screen...`);
+                await new Promise(resolve => setTimeout(resolve, 5000)); 
 
                 await page.mouse.click(187, 406, { button: 'left' });
                 console.log(`[Visitor ${visitorNum}] Clicked at the center of the mobile screen.`);
 
                 console.log(`[Visitor ${visitorNum}] Waiting on redirected page...`);
-                await page.waitForTimeout(2000);
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 const pages = await browser.pages();
                 if (pages.length > 2) {
                     const newPage = pages[pages.length - 1];
-                    await newPage.waitForTimeout(3000);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                     await newPage.close().catch(() => {});
                     console.log(`[Visitor ${visitorNum}] Closed redirected tab and returned to main page.`);
                 } else {
-                    await page.waitForTimeout(3000);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                     await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
                     console.log(`[Visitor ${visitorNum}] Performed goBack() and returned to main page.`);
                 }
             }
         } catch (e) {}
 
-        // --- পেজে ঢোকার ঠিক ৫ সেকেন্ড পর স্ক্রিনশট তোলার ব্যবস্থা ---
+        // --- ঠিক ৫ সেকেন্ড পর স্ক্রিনশট তোলার ব্যবস্থা ---
         console.log(`[Visitor ${visitorNum}] Waiting 5 seconds to take main page screenshot...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
         await page.screenshot({ path: `screenshot_visitor_${visitorNum}.png` }).catch(() => {});
         console.log(`[Visitor ${visitorNum}] Main page screenshot taken successfully!`);
 
-        const targetDurationSec = getRandomInt(240, sessionMinutes * 60); 
+        const targetDurationSec = Math.max(10, Math.floor(sessionMinutes * 60)); 
         const targetDurationMs = targetDurationSec * 1000;
         const sessionStartTimeOffset = Date.now(); 
 
-        console.log(`[Visitor ${visitorNum}] Session active target: ~${(targetDurationSec/60).toFixed(1)} Minutes...`);
+        console.log(`[Visitor ${visitorNum}] Session active target: ~${targetDurationSec} Seconds...`);
 
         while (Date.now() - sessionStartTimeOffset < targetDurationMs) {
             if (totalBytesTransferred >= MAX_DATA_BYTES) {
@@ -238,7 +231,7 @@ async function runVisitor(visitorNum) {
                 }, scrollAmount);
             } catch (err) {}
 
-            const pauseTime = getRandomInt(4000, 8000);
+            const pauseTime = getRandomInt(3000, 5000);
             await new Promise(resolve => setTimeout(resolve, pauseTime));
         }
 
@@ -253,14 +246,14 @@ async function runVisitor(visitorNum) {
     } catch (error) {
         const totalDurationSec = ((Date.now() - sessionStartTime) / 1000).toFixed(1);
         const finalMB = (totalBytesTransferred / (1024 * 1024)).toFixed(4);
-        console.log(`[Visitor ${visitorNum}] [INFO] Session ended. Time: ${totalDurationSec}s | Data Used: ${finalMB} MB`);
+        console.log(`[Visitor ${visitorNum}] [INFO] Session ended (${error.message}). Time: ${totalDurationSec}s | Data Used: ${finalMB} MB`);
     } finally {
         await browser.close();
     }
 }
 
 async function main() {
-    console.log(`Starting visitor bot execution for ${VISITOR_COUNT} visitors...`);
+    console.log(`Starting direct visitor bot execution for ${VISITOR_COUNT} visitors...`);
     
     for (let i = 1; i <= VISITOR_COUNT; i++) {
         console.log(`Launching Visitor ${i}...`);
