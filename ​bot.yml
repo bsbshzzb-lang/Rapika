@@ -1,0 +1,55 @@
+name: Run Visitor Bot with Proxy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target Campaign URL'
+        required: true
+        default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
+      proxy_user:
+        description: 'Proxy Username'
+        required: true
+        default: '4903c5e423ff85d767de_gr'
+      total_visitors:
+        description: 'Total Visitors Count'
+        required: true
+        default: '10'
+      max_mb:
+        description: 'Max Data Limit (MB)'
+        required: true
+        default: '1.0'
+      session_minutes:
+        description: 'Session Duration (Minutes)'
+        required: true
+        default: '5'
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install puppeteer-core
+
+      - name: Run Bot Script
+        env:
+          CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
+          PROXY_USER_INPUT: ${{ github.event.inputs.proxy_user }}
+          VISITOR_COUNT: ${{ github.event.inputs.total_visitors }}
+          MAX_MB: ${{ github.event.inputs.max_mb }}
+          SESSION_MINUTES: ${{ github.event.inputs.session_minutes }}
+        run: node index.js
+
+      - name: Upload Screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-screenshots
+          path: screenshot_*.png
