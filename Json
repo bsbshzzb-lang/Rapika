@@ -1,0 +1,14 @@
+{
+  "name": "puppeteer-bot",
+  "version": "1.0.0",
+  "description": "Stealth Puppeteer Bot with proxy support",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}
