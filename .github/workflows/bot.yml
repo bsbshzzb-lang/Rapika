@@ -1,4 +1,4 @@
-name: Run Visitor Bot with Proxy
+name: Run Visitor Bot (Direct)
 
 on:
   workflow_dispatch:
@@ -7,10 +7,6 @@ on:
         description: 'Target Campaign URL'
         required: true
         default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
-      proxy_user:
-        description: 'Proxy Username'
-        required: true
-        default: '4903c5e423ff85d767de_gr'
       total_visitors:
         description: 'Total Visitors Count'
         required: true
@@ -22,7 +18,7 @@ on:
       session_minutes:
         description: 'Session Duration (Minutes)'
         required: true
-        default: '5'
+        default: '0.5'
 
 jobs:
   run-bot:
@@ -42,7 +38,6 @@ jobs:
       - name: Run Bot Script
         env:
           CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
-          PROXY_USER_INPUT: ${{ github.event.inputs.proxy_user }}
           VISITOR_COUNT: ${{ github.event.inputs.total_visitors }}
           MAX_MB: ${{ github.event.inputs.max_mb }}
           SESSION_MINUTES: ${{ github.event.inputs.session_minutes }}
