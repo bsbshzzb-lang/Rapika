@@ -153,23 +153,23 @@ async function runVisitor(visitorNum) {
             }
         } catch (e) {}
 
-        // সেন্ট্রাল ক্লিক এবং রিডাইরেক্ট পেজ হ্যান্ডলিং
+        // --- লাল বাটনে ("পড়া শুরু করুন") ২ বার ক্লিক করার ব্যবস্থা ---
         try {
             await new Promise(resolve => setTimeout(resolve, 3000));
-            let actionDone = false;
+            console.log(`[Visitor ${visitorNum}] Searching for "পড়া শুরু করুন" / Play button...`);
 
-            const playClicked = await page.evaluate(() => {
+            const actionClicked = await page.evaluate(async () => {
                 const elements = Array.from(document.querySelectorAll('button, a, div, span, video, input[type="button"]'));
-                const playKeywords = ['play', 'start', 'watch', 'stream', 'click', 'load', 'join', 'view', 'موافق', 'تشغيل'];
+                const playKeywords = ['পড়া শুরু করুন', 'play', 'start', 'watch', 'stream', 'click', 'load', 'join', 'view', 'موافق', 'تشغيل'];
 
                 for (let el of elements) {
                     const text = el.innerText ? el.innerText.trim().toLowerCase() : '';
                     const className = el.className ? String(el.className).toLowerCase() : '';
                     const idName = el.id ? String(el.id).toLowerCase() : '';
                     
-                    const isPlayElement = playKeywords.some(kw => text.includes(kw) || className.includes(kw) || idName.includes(kw));
+                    const isTarget = playKeywords.some(kw => text.includes(kw) || className.includes(kw) || idName.includes(kw));
                     
-                    if (isPlayElement && el.offsetParent !== null) {
+                    if (isTarget && el.offsetParent !== null) {
                         el.click();
                         return { success: true, descriptor: text || className || idName };
                     }
@@ -177,36 +177,46 @@ async function runVisitor(visitorNum) {
                 return { success: false };
             });
 
-            if (playClicked && playClicked.success) {
-                console.log(`[Visitor ${visitorNum}] [SUCCESS] Clicked on Play/Action button: "${playClicked.descriptor}"`);
-                actionDone = true;
-            }
+            if (actionClicked && actionClicked.success) {
+                console.log(`[Visitor ${visitorNum}] [SUCCESS] Clicked 1st time on: "${actionClicked.descriptor}"`);
+                
+                // ২য় বার ক্লিকের জন্য একটু অপেক্ষা করে আবার ক্লিক করা
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                await page.evaluate(() => {
+                    const elements = Array.from(document.querySelectorAll('button, a, div, span, video, input[type="button"]'));
+                    const playKeywords = ['পড়া শুরু করুন', 'play', 'start', 'watch', 'stream', 'click', 'load', 'join', 'view'];
+                    for (let el of elements) {
+                        const text = el.innerText ? el.innerText.trim().toLowerCase() : '';
+                        if (playKeywords.some(kw => text.includes(kw)) && el.offsetParent !== null) {
+                            el.click();
+                            break;
+                        }
+                    }
+                });
+                console.log(`[Visitor ${visitorNum}] [SUCCESS] Clicked 2nd time successfully!`);
 
-            if (!actionDone) {
-                console.log(`[Visitor ${visitorNum}] No explicit action button found. Waiting to click center of screen...`);
-                await new Promise(resolve => setTimeout(resolve, 5000)); 
-
+            } else {
+                console.log(`[Visitor ${visitorNum}] Button not found via text. Clicking center of screen twice...`);
                 await page.mouse.click(187, 406, { button: 'left' });
-                console.log(`[Visitor ${visitorNum}] Clicked at the center of the mobile screen.`);
-
-                console.log(`[Visitor ${visitorNum}] Waiting on redirected page...`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                const pages = await browser.pages();
-                if (pages.length > 2) {
-                    const newPage = pages[pages.length - 1];
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    await newPage.close().catch(() => {});
-                    console.log(`[Visitor ${visitorNum}] Closed redirected tab and returned to main page.`);
-                } else {
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
-                    console.log(`[Visitor ${visitorNum}] Performed goBack() and returned to main page.`);
-                }
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await page.mouse.click(187, 406, { button: 'left' });
+                console.log(`[Visitor ${visitorNum}] Clicked center twice.`);
             }
+
+            // নতুন ট্যাব বা রিডাইরেক্ট হ্যান্ডেল করা
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const pages = await browser.pages();
+            if (pages.length > 2) {
+                const newPage = pages[pages.length - 1];
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await newPage.close().catch(() => {});
+                console.log(`[Visitor ${visitorNum}] Closed redirected tab and returned to main page.`);
+            }
+
         } catch (e) {}
 
-        // --- ঠিক ৫ সেকেন্ড পর স্ক্রিনশট তোলার ব্যবস্থা ---
+        // --- স্ক্রিনশট তোলার ব্যবস্থা ---
         console.log(`[Visitor ${visitorNum}] Waiting 5 seconds to take main page screenshot...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
         await page.screenshot({ path: `screenshot_visitor_${visitorNum}.png` }).catch(() => {});
